@@ -15,7 +15,7 @@ public class MessageController {
     }
 
     @PostMapping
-    private String sendMessage(@RequestParam("message") String message) {
+    public String sendMessage(@RequestParam("message") String message) {
         String topic = "gait-posture-topic";
         kafkaTemplate.send(topic, message);
         return "Message sent to kafka:" + message;
