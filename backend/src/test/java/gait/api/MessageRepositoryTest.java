@@ -17,7 +17,8 @@ public class MessageRepositoryTest {
 
     @Test
     void shouldSaveAndFindMessage() {
-        GaitMessage gaitMessage = new GaitMessage("db_test");
+        GaitMessage gaitMessage = new GaitMessage();
+        gaitMessage.setMessage("db_test");
         messageRepository.save(gaitMessage);
     }
 }
