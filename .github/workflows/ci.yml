@@ -37,6 +37,7 @@ jobs:
           if [ -f "./mvnw" ]; then chmod +x ./mvnw; fi
 
       - name: Build and run tests
+        working-directory: ./backend
         # use ./mvnw if you commit the Maven wrapper, otherwise `mvn`
         run: ./mvnw -B -e clean verify
         # run `mvn -B -e clean verify` if you don't have mvnw
