@@ -1,11 +1,11 @@
-name: CI
+name: CiI
 
 permissions:
   contents: read
 
 on:
   push:
-    branches: ["main"]
+    branches: ["*"]
   pull_request:
     branches: ["main"]
 
