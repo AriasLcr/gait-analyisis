@@ -1,6 +1,6 @@
 package gait.api.controller;
 
-import org.apache.kafka.common.protocol.Message;
+import gait.api.utils.HtmlSanitizer;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,7 +17,8 @@ public class MessageController {
     @PostMapping
     public String sendMessage(@RequestParam("message") String message) {
         String topic = "gait-posture-topic";
-        kafkaTemplate.send(topic, message);
+        String cleanMessage = HtmlSanitizer.sanitizeHtml(message);
+        kafkaTemplate.send(topic, cleanMessage);
         return "Message sent to kafka:" + message;
     }
 }
