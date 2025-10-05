@@ -19,6 +19,6 @@ public class MessageController {
         String topic = "gait-posture-topic";
         String cleanMessage = HtmlSanitizer.sanitizeHtml(message);
         kafkaTemplate.send(topic, cleanMessage);
-        return "Message sent to kafka:" + message;
+        return "Message sent to kafka:" + cleanMessage;
     }
 }
