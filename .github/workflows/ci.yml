@@ -8,7 +8,8 @@ on:
     branches: ["*"]
   pull_request:
     branches: ["main"]
-
+env:
+  LOCAL_ACT: false
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -57,7 +58,22 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-site
-          path: target/site/jacoco/**
+          path: ./backend/target/site/jacoco/**
+
+      - name: Publish JaCoCo Coverage Summary
+        if: always()
+        run: |
+          echo "## JaCoCo Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f ./backend/target/site/jacoco/jacoco.xml ]; then
+            coverage_line=$(grep -A 1 "<counter type=\"LINE\"" ./backend/target/site/jacoco/jacoco.xml | \
+              grep -Eo 'covered="[0-9]+" missed="[0-9]+"' | \
+              awk -F'"' '{c+=$2; m+=$4} END { if (c+m > 0) printf("Lines covered: %d / %d (%.0f%%)\n", c, c+m, 100*c/(c+m)); else print "No coverage data found." }')
+            echo "$coverage_line" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "JaCoCo XML report not found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+
 
   # Optional: Build and push Docker image when pushing to main
   docker-build:
