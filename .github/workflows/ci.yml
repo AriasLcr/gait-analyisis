@@ -1,4 +1,4 @@
-name: CiI
+name: CI
 
 permissions:
   contents: read
@@ -8,8 +8,10 @@ on:
     branches: ["*"]
   pull_request:
     branches: ["main"]
+
 env:
   LOCAL_ACT: false
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -39,9 +41,10 @@ jobs:
 
       - name: Build and run tests
         working-directory: ./backend
-        # use ./mvnw if you commit the Maven wrapper, otherwise `mvn`
         run: ./mvnw -B -e clean verify
-        # run `mvn -B -e clean verify` if you don't have mvnw
+
+      - name: List backend target directory (debug)
+        run: ls -R ./backend/target || echo "Target directory not found"
 
       - name: Upload test reports
         if: always()
@@ -49,16 +52,16 @@ jobs:
         with:
           name: test-reports
           path: |
-            target/surefire-reports/**
-            target/failsafe-reports/**
-            target/*.log
+            backend/target/surefire-reports/**
+            backend/target/failsafe-reports/**
+            backend/target/*.log
 
       - name: Upload JaCoCo (coverage) HTML
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-site
-          path: ./backend/target/site/jacoco/**
+          path: backend/target/site/jacoco/**
 
       - name: Publish JaCoCo Coverage Summary
         if: always()
@@ -73,9 +76,6 @@ jobs:
             echo "JaCoCo XML report not found." >> $GITHUB_STEP_SUMMARY
           fi
 
-
-
-  # Optional: Build and push Docker image when pushing to main
   docker-build:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -83,6 +83,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -94,11 +95,10 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN || env.LOCAL_ACT_TOKEN }}
 
       - name: Build and push image
         run: |
           IMAGE=ghcr.io/${{ github.repository }}:${{ github.sha }}
           docker build -t $IMAGE .
           docker push $IMAGE
-
