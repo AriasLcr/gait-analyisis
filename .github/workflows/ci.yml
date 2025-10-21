@@ -11,9 +11,9 @@ on:
 
 env:
   LOCAL_ACT: false
-  SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
-  SPRING_DATASOURCE_USERNAME: test
-  SPRING_DATASOURCE_PASSWORD: test
+  SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/gaitdb
+  SPRING_DATASOURCE_USERNAME: gait_user
+  SPRING_DATASOURCE_PASSWORD: gait_pass
 
 jobs:
  build-and-test:
@@ -22,22 +22,22 @@ jobs:
     postgres:
       image: postgres:15
       env:
-        POSTGRES_USER: test
-        POSTGRES_PASSWORD: test
-        POSTGRES_DB: testdb
+        POSTGRES_USER: gait_user
+        POSTGRES_PASSWORD: gait_pass
+        POSTGRES_DB: gaitdb
       ports:
         - 5432:5432
       options: >-
-        --health-cmd="pg_isready -U test -d testdb"
+        --health-cmd="pg_isready -U test -d gaitdb"
         --health-interval=5s
         --health-timeout=5s
         --health-retries=10
 
   env:
     CI: true
-    SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
-    SPRING_DATASOURCE_USERNAME: test
-    SPRING_DATASOURCE_PASSWORD: test
+    SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/gaitdb
+    SPRING_DATASOURCE_USERNAME: gait_user
+    SPRING_DATASOURCE_PASSWORD: gait_pass
 
   steps:
     - name: Checkout
