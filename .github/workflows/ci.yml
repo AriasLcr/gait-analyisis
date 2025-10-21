@@ -78,7 +78,15 @@ jobs:
       - name: Test database connection
         run: |
           echo "Testing connection to PostgreSQL..."
-          PGPASSWORD=gait_pass psql -h postgres -U gait_user -d gaitdb -c "SELECT version();"
+          for i in {1..10}; do
+            if PGPASSWORD=gait_pass psql -h postgres -U gait_user -d gaitdb -c "SELECT version();"; then
+              echo "Connection successful"
+              break
+            else
+              echo "Connection failed, retrying ($i/10)..."
+              sleep 2
+            fi
+          done
 
       - name: Build and run tests
         working-directory: ./backend
