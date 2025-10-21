@@ -16,97 +16,101 @@ env:
   SPRING_DATASOURCE_PASSWORD: gait_pass
 
 jobs:
- build-and-test:
-  runs-on: ubuntu-latest
-  services:
-    postgres:
-      image: postgres:15
-      env:
-        POSTGRES_USER: gait_user
-        POSTGRES_PASSWORD: gait_pass
-        POSTGRES_DB: gaitdb
-      ports:
-        - 5432:5432
-      options: >-
-        --health-cmd="pg_isready -U test -d gaitdb"
-        --health-interval=5s
-        --health-timeout=5s
-        --health-retries=10
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: gait_user
+          POSTGRES_PASSWORD: gait_pass
+          POSTGRES_DB: gaitdb
+        # NOTE: leaving out host port mapping avoids runner port conflicts
+        options: >-
+          --health-cmd="pg_isready -U gait_user -d gaitdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
 
-  env:
-    CI: true
-    SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/gaitdb
-    SPRING_DATASOURCE_USERNAME: gait_user
-    SPRING_DATASOURCE_PASSWORD: gait_pass
+    env:
+      CI: true
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/gaitdb
+      SPRING_DATASOURCE_USERNAME: gait_user
+      SPRING_DATASOURCE_PASSWORD: gait_pass
 
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: "21"
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
 
-    - name: Cache Maven repository
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2/repository
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-maven-
+      - name: Cache Maven repository
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
 
-    - name: Make mvnw executable (if present)
-      run: |
-        if [ -f "./mvnw" ]; then chmod +x ./mvnw; fi
+      - name: Make mvnw executable (if present)
+        run: |
+          if [ -f "./mvnw" ]; then chmod +x ./mvnw; fi
 
-    - name: Wait for Postgres to be ready
-      run: |
-        echo "Waiting for Postgres on localhost:5432..."
-        for i in {1..30}; do
-          if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-            echo "Postgres port open"
-            break
+      - name: Install postgres client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres to be ready (pg_isready)
+        env:
+          PGPASSWORD: gait_pass
+        run: |
+          echo "Waiting for Postgres on localhost:5432..."
+          for i in {1..60}; do
+            if pg_isready -h 127.0.0.1 -p 5432 -U gait_user; then
+              echo "Postgres is ready"
+              break
+            fi
+            echo "Postgres not ready yet ($i/60) — sleeping 2s"
+            sleep 2
+          done
+          # final assert
+          pg_isready -h 127.0.0.1 -p 5432 -U gait_user || (echo "Postgres didn't start" && exit 1)
+
+      - name: Build and run tests
+        working-directory: ./backend
+        run: ./mvnw -B -e clean verify
+
+      - name: List backend target directory (debug)
+        run: ls -R ./backend/target || echo "Target directory not found"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            backend/target/surefire-reports/**
+            backend/target/failsafe-reports/**
+            backend/target/*.log
+
+      - name: Upload JaCoCo (coverage) HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-site
+          path: backend/target/site/jacoco/**
+
+      - name: Publish JaCoCo Coverage Summary
+        if: always()
+        run: |
+          echo "## JaCoCo Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f ./backend/target/site/jacoco/jacoco.xml ]; then
+            coverage_line=$(grep -A 1 "<counter type=\"LINE\"" ./backend/target/site/jacoco/jacoco.xml | \
+              grep -Eo 'covered="[0-9]+" missed="[0-9]+"' | \
+              awk -F'"' '{c+=$2; m+=$4} END { if (c+m > 0) printf("Lines covered: %d / %d (%.0f%%)\n", c, c+m, 100*c/(c+m)); else print "No coverage data found." }')
+            echo "$coverage_line" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "JaCoCo XML report not found." >> $GITHUB_STEP_SUMMARY
           fi
-          echo "Postgres not reachable yet ($i/30) — sleeping 2s"
-          sleep 2
-        done
-        # final check using pg_isready inside the postgres container (useful when health checks are present)
-        docker run --rm --network host postgres:15 pg_isready -h 127.0.0.1 -p 5432 -U test || true
-
-    - name: Build and run tests
-      working-directory: ./backend
-      run: ./mvnw -B -e clean verify
-
-    - name: List backend target directory (debug)
-      run: ls -R ./backend/target || echo "Target directory not found"
-
-    - name: Upload test reports
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-reports
-        path: |
-          backend/target/surefire-reports/**
-          backend/target/failsafe-reports/**
-          backend/target/*.log
-
-    - name: Upload JaCoCo (coverage) HTML
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: jacoco-site
-        path: backend/target/site/jacoco/**
-
-    - name: Publish JaCoCo Coverage Summary
-      if: always()
-      run: |
-        echo "## JaCoCo Coverage Summary" >> $GITHUB_STEP_SUMMARY
-        if [ -f ./backend/target/site/jacoco/jacoco.xml ]; then
-          coverage_line=$(grep -A 1 "<counter type=\"LINE\"" ./backend/target/site/jacoco/jacoco.xml | \
-            grep -Eo 'covered="[0-9]+" missed="[0-9]+"' | \
-            awk -F'"' '{c+=$2; m+=$4} END { if (c+m > 0) printf("Lines covered: %d / %d (%.0f%%)\n", c, c+m, 100*c/(c+m)); else print "No coverage data found." }')
-          echo "$coverage_line" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "JaCoCo XML report not found." >> $GITHUB_STEP_SUMMARY
-        fi
