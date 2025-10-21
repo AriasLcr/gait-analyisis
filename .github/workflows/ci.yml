@@ -60,6 +60,9 @@ jobs:
         run: |
           if [ -f "./mvnw" ]; then chmod +x ./mvnw; fi
 
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: Wait for Postgres to be ready
         run: |
           echo "Waiting for Postgres on postgres:5432..."
@@ -71,6 +74,11 @@ jobs:
             echo "Still waiting ($i/30)..."
             sleep 2
           done
+
+      - name: Test database connection
+        run: |
+          echo "Testing connection to PostgreSQL..."
+          PGPASSWORD=gait_pass psql -h postgres -U gait_user -d gaitdb -c "SELECT version();"
 
       - name: Build and run tests
         working-directory: ./backend
